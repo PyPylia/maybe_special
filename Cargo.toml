@@ -1,0 +1,32 @@
+[package]
+name = "maybe_special"
+version = "1.0.0"
+authors = ["PyPylia <contact@pypylia.dev>"]
+categories = ["hardware-support", "development-tools", "no-std"]
+description = "Dynamic target feature specialisation macro"
+documentation = "https://docs.rs/maybe_special"
+edition = "2024"
+keywords = [
+    "target_feature",
+    "cpu",
+    "specialisation",
+    "std_detect",
+    "detect_feature",
+]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/pypylia/maybe_special"
+readme = "README.md"
+
+[lib]
+proc-macro = true
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+quote = "1.0"
+proc-macro2 = "1.0"
+venial = "0.6"
+unicode-ident = "1.0"
+litrs = { version = "0.5", features = ["proc-macro2"] }
