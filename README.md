@@ -1,11 +1,11 @@
 # Rust Dynamic Target Feature Specialisation Macro
 
-[<img alt="github" src="https://img.shields.io/badge/github-dtolnay/quote-8da0cb?style=for-the-badge&labelColor=555555&logo=github" height="20">](https://github.com/pypylia/maybe_special)
-[<img alt="crates.io" src="https://img.shields.io/crates/v/quote.svg?style=for-the-badge&color=fc8d62&logo=rust" height="20">](https://crates.io/crates/maybe_special)
-[<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-quote-66c2a5?style=for-the-badge&labelColor=555555&logo=docs.rs" height="20">](https://docs.rs/maybe_special)
+[<img alt="github" src="https://img.shields.io/badge/github-pypylia/maybe_special-8da0cb?style=for-the-badge&labelColor=555555&logo=github" height="20">](https://github.com/pypylia/maybe_special)
+[<img alt="crates.io" src="https://img.shields.io/crates/v/maybe_special.svg?style=for-the-badge&color=fc8d62&logo=rust" height="20">](https://crates.io/crates/maybe_special)
+[<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-maybe_special-66c2a5?style=for-the-badge&labelColor=555555&logo=docs.rs" height="20">](https://docs.rs/maybe_special)
 
-This crate provides the [`#[make_special]`] attribute macro to create a series
-of target feature specialisations for the given function.
+This crate provides the [`#[make_special]`](https://docs.rs/maybe_special/latest/maybe_special/attr.make_special.html)
+attribute macro to create a series of target feature specialisations for the given function.
 
 ```toml
 [dependencies]
@@ -114,8 +114,6 @@ macro falls back to a jump table dispatch method, where instead of utilising
 a function pointer directly, it instead utilises an index into a jump table.
 This dispatch method is almost identical to the function pointer method,
 however can be a few cycles slower.
-
-[`#[make_special]`]: https://docs.rs/maybe_special/1.0/maybe_special/macro.maybe_special.html
 
 [`std::arch`]: https://doc.rust-lang.org/stable/std/arch/index.html
 [`std_detect`]: https://doc.rust-lang.org/nightly/std_detect/index.html
