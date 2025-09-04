@@ -144,7 +144,7 @@ impl<'a> FnBuilder<'a> {
         quote! {
             #(#[#attributes])*
             #tk_const #tk_async #tk_unsafe #tk_extern #extern_abi
-            fn #name #generics (#params) #where_clause -> #return_ty { #body }
+            fn #name #generics (#params) -> #return_ty #where_clause { #body }
         }
     }
 

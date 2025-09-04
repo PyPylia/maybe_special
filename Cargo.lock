@@ -13,7 +13,7 @@ dependencies = [
 
 [[package]]
 name = "maybe_special"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "litrs",
  "proc-macro2",

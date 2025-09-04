@@ -1,6 +1,6 @@
 [package]
 name = "maybe_special"
-version = "1.0.1"
+version = "1.0.2"
 authors = ["PyPylia <contact@pypylia.dev>"]
 categories = ["hardware-support", "development-tools", "no-std"]
 description = "Dynamic target feature specialisation macro"
