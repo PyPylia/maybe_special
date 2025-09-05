@@ -30,55 +30,43 @@ impl<'a> FnBuilder<'a> {
         };
 
         for (param, _) in orig.params.iter() {
-            match param {
+            let param = match param {
                 FnParam::Receiver(rec_param) => {
                     return Err(Error::new_at_span(
                         rec_param.tk_self.span(),
                         "make_special cannot take fn items that use self, please read the crate documentation for more details.",
                     ));
                 }
-                FnParam::Typed(FnTypedParam {
-                    attributes,
-                    name,
-                    tk_colon,
-                    ty,
-                    ..
-                }) => {
-                    if ty.tokens.iter().any(|token| {
-                        if let TokenTree::Ident(ident) = token {
-                            ident.to_string() == "impl"
-                        } else {
-                            false
-                        }
-                    }) {
-                        use_jump_table = true;
-                    }
+                FnParam::Typed(param) => param,
+            };
 
-                    outer_params.push(
-                        FnTypedParam {
-                            attributes: attributes.clone(),
-                            tk_mut: None,
-                            name: name.clone(),
-                            tk_colon: tk_colon.clone(),
-                            ty: ty.clone(),
-                        },
-                        None,
-                    );
-                    param_idents.push(name, None);
-                    param_tys.push(ty, None);
-                }
+            if param.ty.tokens.iter().any(
+                |token| matches!(token, TokenTree::Ident(ident) if ident.to_string() == "impl"),
+            ) {
+                use_jump_table = true;
             }
+
+            outer_params.push(
+                FnTypedParam {
+                    attributes: param.attributes.clone(),
+                    tk_mut: None,
+                    name: param.name.clone(),
+                    tk_colon: param.tk_colon.clone(),
+                    ty: param.ty.clone(),
+                },
+                None,
+            );
+            param_idents.push(&param.name, None);
+            param_tys.push(&param.ty, None);
         }
 
         if let Some(generics) = &orig.generic_params {
             for (generic, _) in generics.params.iter() {
-                if !generic.tk_prefix.as_ref().is_some_and(|tk_prefix| {
-                    if let TokenTree::Punct(_) = tk_prefix {
-                        true
-                    } else {
-                        false
-                    }
-                }) {
+                if !generic
+                    .tk_prefix
+                    .as_ref()
+                    .is_some_and(|tk_prefix| matches!(tk_prefix, TokenTree::Punct(_)))
+                {
                     use_jump_table = true;
                     break;
                 }
