@@ -24,6 +24,7 @@ pub struct Specialisation<'a> {
     pub arch: Architecture,
     pub features: HashSet<String>,
     pub is_static: bool,
+    pub is_manual: bool,
     pub ident: Ident,
 }
 
@@ -65,7 +66,17 @@ impl<'a> Specialisation<'a> {
                 .ok_or_else(|| Error::new("expected = but found nothing"))?;
 
             let features = parse_features(&mut iter, &mut name)?;
-            let ident = parse_ident(&mut iter, &name)?;
+            let is_manual;
+            let ident = match parse_ident(&mut iter)? {
+                Some(ident) => {
+                    is_manual = true;
+                    ident
+                }
+                None => {
+                    is_manual = false;
+                    Ident::new(&name, Span::call_site())
+                }
+            };
 
             output
                 .entry(arch)
@@ -75,6 +86,7 @@ impl<'a> Specialisation<'a> {
                     arch,
                     features,
                     is_static,
+                    is_manual,
                     ident,
                 });
         }
@@ -98,7 +110,11 @@ fn parse_features(
 
             name.reserve(feature.len() + 1);
             name.push('_');
-            name.push_str(&feature);
+            for ch in feature.chars() {
+                if unicode_ident::is_xid_continue(ch) {
+                    name.push(ch);
+                }
+            }
 
             features.insert(feature);
         } else {
@@ -116,19 +132,18 @@ fn parse_features(
     }
 }
 
-fn parse_ident(iter: &mut impl Iterator<Item = TokenTree>, name: &str) -> Result<Ident, Error> {
-    let mut ident = Ident::new(&name, Span::call_site());
-
+fn parse_ident(iter: &mut impl Iterator<Item = TokenTree>) -> Result<Option<Ident>, Error> {
+    let mut ident = None;
     if let Some(TokenTree::Punct(punct)) = iter.next() {
         if punct.as_char() == ',' {
-            return Ok(ident);
+            return Ok(None);
         }
 
         let _gt = iter.next();
         let unsafe_ident = expect_token!(Ident = iter.next(), "unsafe");
         let unsafe_str = unsafe_ident.to_string();
         if unsafe_str == "unsafe" {
-            ident = expect_token!(Ident = iter.next(), "ident");
+            ident = Some(expect_token!(Ident = iter.next(), "ident"));
         } else {
             return Err(Error::new_at_span(
                 unsafe_ident.span(),
@@ -144,6 +159,10 @@ fn parse_ident(iter: &mut impl Iterator<Item = TokenTree>, name: &str) -> Result
 
 impl ToTokens for Specialisation<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
+        if self.is_manual {
+            return;
+        }
+
         let mut features = String::new();
 
         for feature in &self.features {
