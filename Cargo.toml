@@ -30,3 +30,4 @@ proc-macro2 = "1.0"
 venial = "0.6"
 unicode-ident = "1.0"
 litrs = { version = "0.5", features = ["proc-macro2"] }
+indexmap = "2.11"

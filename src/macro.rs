@@ -1,7 +1,7 @@
 use crate::{FnBuilder, Specialisation};
+use indexmap::IndexSet;
 use proc_macro2::{Ident, Literal, Span, TokenStream, TokenTree};
 use quote::{ToTokens, quote};
-use std::collections::HashSet;
 use venial::Function;
 
 pub fn make_special(attr: TokenStream, orig_func: Function) -> TokenStream {
@@ -31,7 +31,7 @@ pub fn make_special(attr: TokenStream, orig_func: Function) -> TokenStream {
         let init_ident = arch.init_ident();
         let detect_macro = arch.detect_macro();
 
-        let features: HashSet<String> = specs
+        let features: IndexSet<String> = specs
             .iter()
             .map(|spec| spec.features.clone())
             .flatten()
