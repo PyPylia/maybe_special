@@ -5,8 +5,11 @@
 //! [docs-rs]: https://img.shields.io/badge/docs.rs-66c2a5?style=for-the-badge&labelColor=555555&logo=docs.rs
 //!
 //! This crate provides the [`#[make_special]`](macro@make_special) attribute
-//! macro to create a series of target feature specialisations for the given
-//! function.
+//! macro to automatically create a series of target feature specialisations for
+//! the given function. This behaves similarly to the Clang [`target_clones`]
+//! attribute.
+//!
+//! [`target_clones`]: https://clang.llvm.org/docs/AttributeReference.html#target-clones
 //!
 //! # Usage
 //! This macro takes in a series of specialisations in the form `arch =
@@ -26,11 +29,11 @@
 //! ```
 //! #[maybe_special::make_special(
 //!     x86 = ["avx512f", "avx512vl"],
-//!     static x86 = ["sse4"],
+//!     static x86 = ["sse4.1"],
 //!     riscv = ["v"]
 //! )]
-//! pub fn fast_dot_product(a: [u8; 16], b: [u8; 16]) -> usize {
-//!     a.iter().zip(b.iter()).map(|(a, b)| (a * b) as usize).sum()
+//! pub fn fast_dot_product(a: [u32; 16], b: [u32; 16]) -> u32 {
+//!     a.iter().zip(b.iter()).map(|(a, b)| a * b).sum()
 //! }
 //! ```
 //!
@@ -55,6 +58,40 @@
 //! }
 //! ```
 //!
+//! # Manual specification implementations
+//! If you wish to implement the specifications manually, you can provide an
+//! implementation yourself by putting `=> unsafe some_impl` after the feature
+//! set. Each impl must have the exact same function signature as the generic
+//! impl. The `unsafe` keyword is required because you must ensure that this
+//! impl will always return the same result as every other impl, otherwise it is
+//! [undefined behaviour] and may cause hard to debug errors.
+//!
+//! **Note: It is not recommended to use manual implementations. Under the hood
+//! this macro uses the [`#[target_feature]`](https://doc.rust-lang.org/reference/attributes/codegen.html#the-target_feature-attribute)
+//! attribute which tells LLVM to output code as if those features were enabled.
+//! LLVM tends to produce more optimised code than anything a human can
+//! produce.**
+//!
+//! [undefined behaviour]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+//!
+//! <h5>Example</h5>
+//!
+//! ```
+//! fn dot_product_avx2(a: [u32; 16], b: [u32; 16]) -> u32 {
+//!     // Your impl here
+//!     ...
+//! }
+//!
+//! #[maybe_special::make_special(
+//!     static x86 = ["avx2"] => unsafe dot_product_avx2,
+//!     static x86 = ["sse4.1"],
+//!     riscv = ["v"]
+//! )]
+//! pub fn dot_product(a: [u32; 16], b: [u32; 16]) -> u32 {
+//!     a.iter().zip(b.iter()).map(|(a, b)| a * b).sum()
+//! }
+//! ```
+//!
 //! # `no_std` support
 //! By default, this macro utilises [`std::arch`], however this can be disabled
 //! by disabling the `std` feature. When the `std` feature is disabled, the code
@@ -73,6 +110,8 @@
 //! the regular dynamic dispatch function at run-time. However, this
 //! intrinsic is currently unstable, so you will need to add
 //! `#![feature(core_intrinsics, const_eval_select)]` to your crate to use this.
+//!
+//! [`const_eval_select`]: core::intrinsics::const_eval_select
 //!
 //! <h5>Static dispatch</h5>
 //!
@@ -106,7 +145,6 @@
 //! however can be a few cycles slower.
 //!
 //! [`std_detect`]: https://doc.rust-lang.org/nightly/std_detect/index.html
-//! [`const_eval_select`]: core::intrinsics::const_eval_select
 
 extern crate proc_macro;
 
