@@ -179,6 +179,7 @@ impl ToTokens for Specialisation<'_> {
         let attributes = &[
             quote!(cfg(#cfg_inner)),
             quote!(target_feature(enable = #enabled_features)),
+            quote!(inline),
         ];
 
         let inner_unsafe = self.builder.inner_unsafe.as_ref();
