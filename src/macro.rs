@@ -74,7 +74,7 @@ pub fn make_special(attr: TokenStream, orig_func: Function) -> TokenStream {
         let spec_val = specs.iter().enumerate().map(if builder.use_jump_table {
             |(i, _)| TokenTree::Literal(Literal::usize_suffixed(i + 2))
         } else {
-            |(_, spec): (usize, &Specialisation)| TokenTree::Ident(spec.as_ident())
+            |(_, spec): (usize, &Specialisation)| TokenTree::Ident(spec.ident.clone())
         });
 
         let prefix = if cfg!(feature = "std") {
@@ -118,7 +118,7 @@ pub fn make_special(attr: TokenStream, orig_func: Function) -> TokenStream {
         let dyn_call = if builder.use_jump_table {
             let init_ident = arch.init_ident();
             let spec_index = 2..=specs.len() + 2;
-            let spec_ident = specs.iter().map(|spec| spec.as_ident());
+            let spec_ident = specs.iter().map(|spec| &spec.ident);
 
             quote! {
                 match unsafe { #jump_ref_ident } {

@@ -9,29 +9,10 @@ pub struct Specialisation<'a> {
     pub arch: Architecture,
     pub features: HashSet<String>,
     pub is_static: bool,
+    pub ident: Ident,
 }
 
 impl<'a> Specialisation<'a> {
-    pub fn as_ident(&self) -> Ident {
-        let arch = self.arch.as_str();
-        let mut name = String::with_capacity(1 + arch.len() + self.features.len());
-        name.push('_');
-        name.push_str(arch);
-
-        for feature in &self.features {
-            name.reserve(feature.len());
-            name.push('_');
-
-            for char in feature.chars() {
-                if unicode_ident::is_xid_continue(char) {
-                    name.push(char.to_ascii_lowercase());
-                }
-            }
-        }
-
-        Ident::new(&name, Span::call_site())
-    }
-
     pub(crate) fn parse(
         builder: &'a FnBuilder<'a>,
         attr: TokenStream,
@@ -41,7 +22,7 @@ impl<'a> Specialisation<'a> {
 
         while let Some(TokenTree::Ident(arch_ident)) = iter.next() {
             let is_static;
-            let arch = match arch_ident.to_string() {
+            let arch: Architecture = match arch_ident.to_string() {
                 val if val == "static" => {
                     is_static = true;
                     match iter.next() {
@@ -70,6 +51,11 @@ impl<'a> Specialisation<'a> {
                 )
             })?;
 
+            let arch_str = arch.as_str();
+            let mut name = String::with_capacity(1 + arch_str.len());
+            name.push('_');
+            name.push_str(arch_str);
+
             let _equals = iter
                 .next()
                 .ok_or_else(|| Error::new("expected = but found nothing"))?;
@@ -80,15 +66,19 @@ impl<'a> Specialisation<'a> {
                     let mut iter = group.stream().into_iter();
                     while let Some(TokenTree::Literal(lit)) = iter.next() {
                         if let litrs::Literal::String(inner) = lit.clone().into() {
-                            features.insert(inner.into_value().to_owned());
+                            let feature = inner.into_value();
+
+                            name.reserve(feature.len() + 1);
+                            name.push('_');
+                            name.push_str(&feature);
+
+                            features.insert(feature);
                         } else {
                             return Err(Error::new_at_span(
                                 lit.span(),
                                 format!("expected a string literal but got {}", lit),
                             ));
                         }
-
-                        let _comma = iter.next();
                     }
                 }
                 Some(other) => {
@@ -108,7 +98,39 @@ impl<'a> Specialisation<'a> {
                 return Err(Error::new("expected features but found nothing"));
             }
 
-            let _comma = iter.next();
+            let mut ident = Ident::new(&name, Span::call_site());
+            if let Some(TokenTree::Punct(punct)) = iter.next() {
+                if punct.as_char() == ',' {
+                    continue;
+                }
+
+                let _gt = iter.next();
+                match iter.next() {
+                    Some(TokenTree::Ident(unsafe_ident))
+                        if unsafe_ident.to_string() == "unsafe" =>
+                    {
+                        match iter.next() {
+                            Some(TokenTree::Ident(manual_ident)) => ident = manual_ident,
+                            Some(other) => {
+                                return Err(Error::new_at_span(
+                                    other.span(),
+                                    format!("expected ident but got {}", other),
+                                ));
+                            }
+                            None => return Err(Error::new("expected ident but found nothing")),
+                        }
+                    }
+                    Some(other) => {
+                        return Err(Error::new_at_span(
+                            other.span(),
+                            format!("expected unsafe but got {}", other),
+                        ));
+                    }
+                    None => return Err(Error::new("expected unsafe but found nothing")),
+                }
+
+                let _comma = iter.next();
+            }
 
             output
                 .entry(arch)
@@ -118,6 +140,7 @@ impl<'a> Specialisation<'a> {
                     arch,
                     features,
                     is_static,
+                    ident,
                 });
         }
 
@@ -151,7 +174,7 @@ impl ToTokens for Specialisation<'_> {
             attributes,
             inner_unsafe,
             true, //copy_const
-            &self.as_ident(),
+            &self.ident,
             quote! { #inner_unsafe { _generic(#param_idents) } },
         ));
     }
