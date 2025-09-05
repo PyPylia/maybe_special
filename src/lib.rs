@@ -1,4 +1,4 @@
-//! [![github]](https://github.com/pypylia/maybe_special)&ensp;[![crates-io]](https://crates.io/crates/maybe_special)&ensp;[![docs-rs]](https://docs.rs/maybe_special)
+//! [![github]](https://github.com/pypylia/maybe_special)&ensp;[![crates-io]](https://crates.io/crates/maybe_special)&ensp;[![docs-rs]](https://docs.rs/maybe_special)&ensp;[![free of syn](https://img.shields.io/badge/free%20of-syn-hotpink?style=for-the-badge)](https://github.com/fasterthanlime/free-of-syn)
 //!
 //! [github]: https://img.shields.io/badge/github-8da0cb?style=for-the-badge&labelColor=555555&logo=github
 //! [crates-io]: https://img.shields.io/badge/crates.io-fc8d62?style=for-the-badge&labelColor=555555&logo=rust
@@ -148,8 +148,6 @@
 //! a function pointer directly, it instead utilises an index into a jump table.
 //! This dispatch method is almost identical to the function pointer method,
 //! however can be a few cycles slower.
-//!
-//! > *This crate is [free of syn](https://github.com/fasterthanlime/free-of-syn).*
 //!
 //! [`std_detect`]: https://doc.rust-lang.org/nightly/std_detect/index.html
 

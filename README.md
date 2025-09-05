@@ -3,6 +3,7 @@
 [<img alt="github" src="https://img.shields.io/badge/github-pypylia/maybe_special-8da0cb?style=for-the-badge&labelColor=555555&logo=github" height="20">](https://github.com/pypylia/maybe_special)
 [<img alt="crates.io" src="https://img.shields.io/crates/v/maybe_special.svg?style=for-the-badge&color=fc8d62&logo=rust" height="20">](https://crates.io/crates/maybe_special)
 [<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-maybe_special-66c2a5?style=for-the-badge&labelColor=555555&logo=docs.rs" height="20">](https://docs.rs/maybe_special)
+[<img alt="free of syn" src="https://img.shields.io/badge/free%20of-syn-hotpink?style=for-the-badge" height="20">](https://github.com/fasterthanlime/free-of-syn)
 
 This crate provides the [`#[make_special]`](https://docs.rs/maybe_special/latest/maybe_special/attr.make_special.html)
 attribute macro to automatically create a series of target feature specialisations
@@ -153,8 +154,6 @@ macro falls back to a jump table dispatch method, where instead of utilising
 a function pointer directly, it instead utilises an index into a jump table.
 This dispatch method is almost identical to the function pointer method,
 however can be a few cycles slower.
-
-> _This crate is [free of syn](https://github.com/fasterthanlime/free-of-syn)._
 
 [`std::arch`]: https://doc.rust-lang.org/stable/std/arch/index.html
 [`std_detect`]: https://doc.rust-lang.org/nightly/std_detect/index.html
