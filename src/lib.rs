@@ -9,6 +9,11 @@
 //! the given function. This behaves similarly to the Clang [`target_clones`]
 //! attribute.
 //!
+//! ```toml
+//! [dependencies]
+//! maybe_special = "1.1"
+//! ```
+//!
 //! [`target_clones`]: https://clang.llvm.org/docs/AttributeReference.html#target-clones
 //!
 //! # Usage
@@ -143,6 +148,8 @@
 //! a function pointer directly, it instead utilises an index into a jump table.
 //! This dispatch method is almost identical to the function pointer method,
 //! however can be a few cycles slower.
+//!
+//! > *This crate is [free of syn](https://github.com/fasterthanlime/free-of-syn).*
 //!
 //! [`std_detect`]: https://doc.rust-lang.org/nightly/std_detect/index.html
 

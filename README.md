@@ -12,7 +12,7 @@ for the given function. This behaves similarly to the Clang [`target_clones`] at
 
 ```toml
 [dependencies]
-maybe_special = "1.0"
+maybe_special = "1.1"
 ```
 
 _This crate is designed for Rust edition 2024 (rustc 1.85+)._
@@ -153,6 +153,8 @@ macro falls back to a jump table dispatch method, where instead of utilising
 a function pointer directly, it instead utilises an index into a jump table.
 This dispatch method is almost identical to the function pointer method,
 however can be a few cycles slower.
+
+> _This crate is [free of syn](https://github.com/fasterthanlime/free-of-syn)._
 
 [`std::arch`]: https://doc.rust-lang.org/stable/std/arch/index.html
 [`std_detect`]: https://doc.rust-lang.org/nightly/std_detect/index.html
