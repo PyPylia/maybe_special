@@ -4,6 +4,21 @@ use quote::{ToTokens, quote};
 use std::collections::{HashMap, HashSet};
 use venial::Error;
 
+macro_rules! expect_token {
+    ($token:ident = $expr:expr, $msg:literal) => {
+        match $expr {
+            Some(TokenTree::$token(token)) => token,
+            Some(other) => {
+                return Err(Error::new_at_span(
+                    other.span(),
+                    format!("expected {} but got {}", $msg, other),
+                ))
+            }
+            None => return Err(Error::new(format!("expected {} but found nothing", $msg))),
+        }
+    };
+}
+
 pub struct Specialisation<'a> {
     builder: &'a FnBuilder<'a>,
     pub arch: Architecture,
@@ -25,18 +40,7 @@ impl<'a> Specialisation<'a> {
             let arch: Architecture = match arch_ident.to_string() {
                 val if val == "static" => {
                     is_static = true;
-                    match iter.next() {
-                        Some(TokenTree::Ident(arch_ident)) => arch_ident.to_string(),
-                        Some(other) => {
-                            return Err(Error::new_at_span(
-                                other.span(),
-                                format!("expected an architecture but got {}", other),
-                            ));
-                        }
-                        None => {
-                            return Err(Error::new("expected an architecture but found nothing"));
-                        }
-                    }
+                    expect_token!(Ident = iter.next(), "an architecture").to_string()
                 }
                 other => {
                     is_static = false;
@@ -60,77 +64,8 @@ impl<'a> Specialisation<'a> {
                 .next()
                 .ok_or_else(|| Error::new("expected = but found nothing"))?;
 
-            let mut features = HashSet::new();
-            match iter.next() {
-                Some(TokenTree::Group(group)) => {
-                    let mut iter = group.stream().into_iter();
-                    while let Some(TokenTree::Literal(lit)) = iter.next() {
-                        if let litrs::Literal::String(inner) = lit.clone().into() {
-                            let feature = inner.into_value();
-
-                            name.reserve(feature.len() + 1);
-                            name.push('_');
-                            name.push_str(&feature);
-
-                            features.insert(feature);
-                        } else {
-                            return Err(Error::new_at_span(
-                                lit.span(),
-                                format!("expected a string literal but got {}", lit),
-                            ));
-                        }
-                    }
-                }
-                Some(other) => {
-                    return Err(Error::new_at_span(
-                        other.span(),
-                        format!("expected [\"feature\", \"feature\", ...] but got {}", other),
-                    ));
-                }
-                None => {
-                    return Err(Error::new(
-                        "expected [\"feature\", \"feature\", ...] but found nothing",
-                    ));
-                }
-            }
-
-            if features.is_empty() {
-                return Err(Error::new("expected features but found nothing"));
-            }
-
-            let mut ident = Ident::new(&name, Span::call_site());
-            if let Some(TokenTree::Punct(punct)) = iter.next() {
-                if punct.as_char() == ',' {
-                    continue;
-                }
-
-                let _gt = iter.next();
-                match iter.next() {
-                    Some(TokenTree::Ident(unsafe_ident))
-                        if unsafe_ident.to_string() == "unsafe" =>
-                    {
-                        match iter.next() {
-                            Some(TokenTree::Ident(manual_ident)) => ident = manual_ident,
-                            Some(other) => {
-                                return Err(Error::new_at_span(
-                                    other.span(),
-                                    format!("expected ident but got {}", other),
-                                ));
-                            }
-                            None => return Err(Error::new("expected ident but found nothing")),
-                        }
-                    }
-                    Some(other) => {
-                        return Err(Error::new_at_span(
-                            other.span(),
-                            format!("expected unsafe but got {}", other),
-                        ));
-                    }
-                    None => return Err(Error::new("expected unsafe but found nothing")),
-                }
-
-                let _comma = iter.next();
-            }
+            let features = parse_features(&mut iter, &mut name)?;
+            let ident = parse_ident(&mut iter, &name)?;
 
             output
                 .entry(arch)
@@ -146,6 +81,65 @@ impl<'a> Specialisation<'a> {
 
         Ok(output)
     }
+}
+
+fn parse_features(
+    iter: &mut impl Iterator<Item = TokenTree>,
+    name: &mut String,
+) -> Result<HashSet<String>, Error> {
+    let mut features = HashSet::new();
+    let mut iter = expect_token!(Group = iter.next(), "[\"feature\", \"feature\", ...]")
+        .stream()
+        .into_iter();
+
+    while let Some(TokenTree::Literal(lit)) = iter.next() {
+        if let litrs::Literal::String(inner) = lit.clone().into() {
+            let feature = inner.into_value();
+
+            name.reserve(feature.len() + 1);
+            name.push('_');
+            name.push_str(&feature);
+
+            features.insert(feature);
+        } else {
+            return Err(Error::new_at_span(
+                lit.span(),
+                format!("expected a string literal but got {}", lit),
+            ));
+        }
+    }
+
+    if features.is_empty() {
+        Err(Error::new("expected features but found nothing"))
+    } else {
+        Ok(features)
+    }
+}
+
+fn parse_ident(iter: &mut impl Iterator<Item = TokenTree>, name: &str) -> Result<Ident, Error> {
+    let mut ident = Ident::new(&name, Span::call_site());
+
+    if let Some(TokenTree::Punct(punct)) = iter.next() {
+        if punct.as_char() == ',' {
+            return Ok(ident);
+        }
+
+        let _gt = iter.next();
+        let unsafe_ident = expect_token!(Ident = iter.next(), "unsafe");
+        let unsafe_str = unsafe_ident.to_string();
+        if unsafe_str == "unsafe" {
+            ident = expect_token!(Ident = iter.next(), "ident");
+        } else {
+            return Err(Error::new_at_span(
+                unsafe_ident.span(),
+                "manual impls must be prefixed with unsafe",
+            ));
+        }
+
+        let _comma = iter.next();
+    }
+
+    Ok(ident)
 }
 
 impl ToTokens for Specialisation<'_> {
