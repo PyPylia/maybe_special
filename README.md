@@ -12,7 +12,7 @@ for the given function. This behaves similarly to the Clang [`target_clones`] at
 
 ```toml
 [dependencies]
-maybe_special = "1.0"
+maybe_special = "1.1"
 ```
 
 _This crate is designed for Rust edition 2024 (rustc 1.85+)._
