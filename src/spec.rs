@@ -1,4 +1,4 @@
-use crate::{Architecture, FnBuilder};
+use crate::{Architecture, FnBuilder, generic_ident};
 use proc_macro2::{Ident, Literal, Span, TokenStream, TokenTree};
 use quote::{ToTokens, quote};
 use std::collections::{HashMap, HashSet};
@@ -182,14 +182,12 @@ impl ToTokens for Specialisation<'_> {
             quote!(inline),
         ];
 
-        let inner_unsafe = self.builder.inner_unsafe.as_ref();
-        let param_idents = &self.builder.param_idents;
         tokens.extend(self.builder.build_detail(
             attributes,
-            inner_unsafe,
             true, //copy_const
+            true, //copy_unsafe
             &self.ident,
-            quote! { #inner_unsafe { _generic(#param_idents) } },
+            self.builder.build_call(&generic_ident()),
         ));
     }
 }

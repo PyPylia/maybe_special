@@ -1,7 +1,7 @@
-use crate::{FnBuilder, Specialisation};
+use crate::{FnBuilder, Specialisation, generic_ident};
 use indexmap::IndexSet;
-use proc_macro2::{Ident, Literal, Span, TokenStream, TokenTree};
-use quote::{ToTokens, quote};
+use proc_macro2::{Ident, Literal, Span, TokenStream};
+use quote::quote;
 use venial::Function;
 
 pub fn make_special(attr: TokenStream, orig_func: Function) -> TokenStream {
@@ -10,13 +10,13 @@ pub fn make_special(attr: TokenStream, orig_func: Function) -> TokenStream {
         Err(err) => return err.to_compile_error().into(),
     };
 
-    let inner_unsafe = &builder.inner_unsafe;
-    let param_idents = &builder.param_idents;
     let specialisations = match Specialisation::parse(&builder, attr) {
         Ok(specs) => specs,
         Err(err) => return err.to_compile_error().into(),
     };
 
+    let generic_call = builder.build_call(&generic_ident());
+    let param_idents = &builder.param_idents;
     let generic = builder.build_generic();
     let spec = specialisations.values().flatten();
     let mut jump_ref = Vec::with_capacity(specialisations.len());
@@ -45,9 +45,15 @@ pub fn make_special(attr: TokenStream, orig_func: Function) -> TokenStream {
         // JUMP REF
 
         let (jump_ref_ty, jump_ref_val) = if builder.use_jump_table {
-            (quote! { usize }, quote! { 0 })
+            (
+                quote! { ::core::sync::atomic::AtomicUsize },
+                quote! { ::core::sync::atomic::AtomicUsize::new(0) },
+            )
         } else {
-            (builder.build_ptr(), arch.init_ident().into_token_stream())
+            (
+                quote! { ::core::sync::atomic::AtomicPtr<()> },
+                quote! { ::core::sync::atomic::AtomicPtr::new(#init_ident as *mut ()) },
+            )
         };
 
         jump_ref.push(quote! {
@@ -72,9 +78,12 @@ pub fn make_special(attr: TokenStream, orig_func: Function) -> TokenStream {
         });
 
         let spec_val = specs.iter().enumerate().map(if builder.use_jump_table {
-            |(i, _)| TokenTree::Literal(Literal::usize_suffixed(i + 2))
+            |(i, _)| quote! { #i + 2 }
         } else {
-            |(_, spec): (usize, &Specialisation)| TokenTree::Ident(spec.ident.clone())
+            |(_, spec): (usize, &Specialisation)| {
+                let spec_ident = &spec.ident;
+                quote! { #spec_ident as *mut () }
+            }
         });
 
         let prefix = if cfg!(feature = "std") {
@@ -86,22 +95,26 @@ pub fn make_special(attr: TokenStream, orig_func: Function) -> TokenStream {
         let generic_val = if builder.use_jump_table {
             quote! { 1 }
         } else {
-            quote! { _generic }
+            quote! { _generic as *mut () }
         };
 
+        let dispatch_call = builder.build_call(&dispatch_ident);
         init.push(builder.build_detail(
             &[quote!(cfg(#cfg_inner))],
-            builder.inner_unsafe.as_ref(),
             false, //copy_const
+            true,  //copy_unsafe
             &init_ident,
             quote! {
                 unsafe {
-                    #jump_ref_ident = match (#(#prefix #detect_macro !(#feature_literal)),*) {
-                        #(#spec_criteria => #spec_val,)*
-                        _ => #generic_val
-                    };
+                    #jump_ref_ident.store(
+                        match (#(#prefix #detect_macro !(#feature_literal)),*) {
+                            #(#spec_criteria => #spec_val,)*
+                            _ => #generic_val
+                        },
+                        ::core::sync::atomic::Ordering::Relaxed
+                    );
                 }
-                #dispatch_ident(#param_idents)
+                #dispatch_call
             },
         ));
 
@@ -111,28 +124,33 @@ pub fn make_special(attr: TokenStream, orig_func: Function) -> TokenStream {
             let feature = spec.features.iter().map(|feature| Literal::string(feature));
             quote! {
                 #[cfg(all(#(target_feature = #feature),*))]
-                return #inner_unsafe { _generic(#param_idents) };
+                return #generic_call;
             }
         });
 
         let dyn_call = if builder.use_jump_table {
-            let init_ident = arch.init_ident();
+            let init_call = builder.build_call(&init_ident);
             let spec_index = 2..=specs.len() + 2;
-            let spec_ident = specs.iter().map(|spec| &spec.ident);
+            let spec_call = specs.iter().map(|spec| builder.build_call(&spec.ident));
 
             quote! {
-                match unsafe { #jump_ref_ident } {
-                    0 => #init_ident(#param_idents),
-                    1 => _generic(#param_idents),
+                match unsafe { #jump_ref_ident.load(::core::sync::atomic::Ordering::Relaxed) } {
+                    0 => #init_call,
+                    1 => #generic_call,
                     #(
-                        #spec_index => unsafe { #spec_ident(#param_idents) },
+                        #spec_index => unsafe #spec_call,
                     )*
                     _ => unsafe { ::core::hint::unreachable_unchecked() }
                 }
             }
         } else {
+            let fn_ptr = builder.build_ptr();
             quote! {
-                unsafe { #jump_ref_ident(#param_idents) }
+                unsafe {
+                    ::core::mem::transmute::<*mut (), #fn_ptr>(
+                        #jump_ref_ident.load(::core::sync::atomic::Ordering::Relaxed)
+                    )(#param_idents)
+                }
             }
         };
 
@@ -142,12 +160,12 @@ pub fn make_special(attr: TokenStream, orig_func: Function) -> TokenStream {
                 quote!(allow(unreachable_code)),
                 quote!(inline(always)),
             ],
-            None,  //tk_unsafe
             false, //copy_const
-            &arch.dispatch_ident(),
+            false, //copy_unsafe
+            &dispatch_ident,
             quote! {
                 #[cfg(all(#(target_feature = #feature_literal),*))]
-                return #inner_unsafe { _generic(#param_idents) };
+                return #generic_call;
 
                 #(#static_call)*
                 #dyn_call
@@ -159,12 +177,10 @@ pub fn make_special(attr: TokenStream, orig_func: Function) -> TokenStream {
         arch_call.push(if orig_func.qualifiers.tk_const.is_some() {
             let safe_generic = builder.build_detail(
                 &[quote!(cfg(#cfg_inner)), quote!(inline(always))],
-                None, //tk_unsafe
                 true, //copy_const
+                false, //copy_unsafe
                 &Ident::new("_safe_generic", Span::call_site()),
-                quote! {
-                    #inner_unsafe { _generic(#param_idents) }
-                },
+                generic_call.clone(),
             );
 
             quote! {
@@ -176,7 +192,7 @@ pub fn make_special(attr: TokenStream, orig_func: Function) -> TokenStream {
         } else {
             quote! {
                 #[cfg(#cfg_inner)]
-                return #dispatch_ident(#param_idents);
+                return #dispatch_call;
             }
         });
     }
@@ -184,9 +200,9 @@ pub fn make_special(attr: TokenStream, orig_func: Function) -> TokenStream {
     let attributes = &orig_func.attributes;
     let vis_marker = &orig_func.vis_marker;
     let outer_def = builder.build_detail(
-        &[], //attributes
-        orig_func.qualifiers.tk_unsafe.as_ref(),
+        &[],  //attributes
         true, //copy_const
+        true, //copy_unsafe
         &orig_func.name,
         quote! {
             #generic
@@ -196,7 +212,7 @@ pub fn make_special(attr: TokenStream, orig_func: Function) -> TokenStream {
             #(#dispatch)*
             #(#arch_call)*
             #[allow(unreachable_code)]
-            #inner_unsafe { _generic(#param_idents) }
+            #generic_call
         },
     );
 

@@ -154,6 +154,7 @@
 extern crate proc_macro;
 
 use proc_macro::TokenStream;
+use proc_macro2::{Ident, Span};
 use venial::{Error, Item};
 
 mod arch;
@@ -164,6 +165,10 @@ mod spec;
 pub(crate) use arch::Architecture;
 pub(crate) use builder::FnBuilder;
 pub(crate) use spec::Specialisation;
+
+pub(crate) fn generic_ident() -> Ident {
+    Ident::new("_generic", Span::call_site())
+}
 
 /// Refer to the [crate-level documentation](crate)
 #[proc_macro_attribute]

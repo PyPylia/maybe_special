@@ -1,4 +1,5 @@
-use proc_macro2::{Ident, Span, TokenStream, TokenTree};
+use crate::generic_ident;
+use proc_macro2::{Ident, TokenStream, TokenTree};
 use quote::{ToTokens, quote};
 use venial::{Error, FnParam, FnTypedParam, Function, Punctuated};
 
@@ -10,7 +11,6 @@ pub(crate) struct FnBuilder<'a> {
     param_tys: TokenStream,
     inner_return_ty: TokenStream,
     outer_return_ty: TokenStream,
-    pub inner_unsafe: Option<Ident>,
 }
 
 impl<'a> FnBuilder<'a> {
@@ -93,11 +93,6 @@ impl<'a> FnBuilder<'a> {
             param_tys: param_tys.into_token_stream(),
             inner_return_ty,
             outer_return_ty,
-            inner_unsafe: if use_jump_table {
-                orig.qualifiers.tk_unsafe.clone()
-            } else {
-                Some(Ident::new("unsafe", Span::call_site()))
-            },
         })
     }
 
@@ -105,8 +100,8 @@ impl<'a> FnBuilder<'a> {
         &self,
         attributes: &[TokenStream],
         copy_async: bool,
-        tk_unsafe: Option<&Ident>,
         copy_const: bool,
+        copy_unsafe: bool,
         name: &Ident,
         params: &TokenStream,
         return_ty: &TokenStream,
@@ -120,6 +115,12 @@ impl<'a> FnBuilder<'a> {
 
         let tk_const = if copy_const {
             &self.orig.qualifiers.tk_const
+        } else {
+            &None
+        };
+
+        let tk_unsafe = if copy_unsafe {
+            &self.orig.qualifiers.tk_unsafe
         } else {
             &None
         };
@@ -139,16 +140,16 @@ impl<'a> FnBuilder<'a> {
     pub fn build_detail(
         &self,
         attributes: &[TokenStream],
-        tk_unsafe: Option<&Ident>,
         copy_const: bool,
+        copy_unsafe: bool,
         name: &Ident,
         body: TokenStream,
     ) -> TokenStream {
         self.build(
             attributes,
             false, //copy_async
-            tk_unsafe,
             copy_const,
+            copy_unsafe,
             name,
             &self.outer_params,
             &self.outer_return_ty,
@@ -160,9 +161,9 @@ impl<'a> FnBuilder<'a> {
         self.build(
             &[quote!(inline(always))],
             true, //copy_async
-            self.inner_unsafe.as_ref(),
             true, //copy_const
-            &Ident::new("_generic", Span::call_site()),
+            true, //copy_unsafe
+            &generic_ident(),
             &self.orig.params.to_token_stream(),
             &self.inner_return_ty,
             match &self.orig.body {
@@ -174,7 +175,7 @@ impl<'a> FnBuilder<'a> {
     }
 
     pub fn build_ptr(&self) -> TokenStream {
-        let tk_unsafe = &self.inner_unsafe;
+        let tk_unsafe = &self.orig.qualifiers.tk_unsafe;
         let tk_extern = &self.orig.qualifiers.tk_extern;
         let extern_abi = &self.orig.qualifiers.extern_abi;
         let param_tys = &self.param_tys;
@@ -193,5 +194,11 @@ impl<'a> FnBuilder<'a> {
             .flatten();
 
         quote! { for<#(#lifetimes),*> #tk_unsafe #tk_extern #extern_abi fn(#param_tys) -> #return_ty }
+    }
+
+    pub fn build_call(&self, ident: &Ident) -> TokenStream {
+        let tk_unsafe = &self.orig.qualifiers.tk_unsafe;
+        let param_idents = &self.param_idents;
+        quote! { #tk_unsafe { #ident(#param_idents) } }
     }
 }
