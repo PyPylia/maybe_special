@@ -35,7 +35,7 @@ dependencies = [
 
 [[package]]
 name = "maybe_special"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "indexmap",
  "litrs",
