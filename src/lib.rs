@@ -9,12 +9,14 @@
 //! the given function. This behaves similarly to the Clang [`target_clones`]
 //! attribute.
 //!
+//! [`target_clones`]: https://clang.llvm.org/docs/AttributeReference.html#target-clones
+//!
 //! ```toml
 //! [dependencies]
 //! maybe_special = "1.1"
 //! ```
 //!
-//! [`target_clones`]: https://clang.llvm.org/docs/AttributeReference.html#target-clones
+//! *This crate is designed for Rust edition 2024 (rustc 1.85+).*
 //!
 //! # Usage
 //! This macro takes in a series of specialisations in the form `arch =
@@ -24,10 +26,25 @@
 //! specialisations can be marked with `static` to enable static dispatch on
 //! them, which is explained below.
 //!
-//! **Note: This macro does not figure out which specialisations are most
-//! optimal for you, that is still something you must benchmark yourself. Rather
-//! this macro merely aids in writing specialisations, and handling their
-//! dispatch.**
+//! <h5>Usage notes</h5>
+//!
+//! - This macro does not figure out which specialisations are most optimal for
+//!   a given function, that is still something you must benchmark yourself.
+//! - Make sure to use this macro sparingly as it can paradoxically add a
+//!   significant performance overhead when applied improperly. This macro adds
+//!   an atomic memory read and creates an inline boundary for every function it
+//!   is applied to. Additionally, the initialisation run upon the first call of
+//!   the function can be comparatively quite slow due to performance issues
+//!   with [`std::arch`]/[`std_detect`]'s `is_*_feature_detected` macros.
+//! - This macro can only specialise any function it is applied to. If a
+//!   function calls another function which isn't inlined, that callee will not
+//!   be specialised.
+//! - Under the hood this macro uses the [`#[target_feature]`](https://doc.rust-lang.org/reference/attributes/codegen.html#the-target_feature-attribute)
+//!   attribute which tells LLVM to output code as if those features were
+//!   enabled. However, it seems there is a bug where any form of [LTO] undoes
+//!   some feature-specific optimisations.
+//!
+//! [LTO]: https://doc.rust-lang.org/cargo/reference/profiles.html#lto
 //!
 //! <h5>Example</h5>
 //!
@@ -71,11 +88,8 @@
 //! impl will always return the same result as every other impl, otherwise it is
 //! [undefined behaviour] and may cause hard to debug errors.
 //!
-//! **Note: It is not recommended to use manual implementations. Under the hood
-//! this macro uses the [`#[target_feature]`](https://doc.rust-lang.org/reference/attributes/codegen.html#the-target_feature-attribute)
-//! attribute which tells LLVM to output code as if those features were enabled.
-//! LLVM tends to produce more optimised code than anything a human can
-//! produce.**
+//! **Note: It is not recommended to use manual implementations. LLVM tends to
+//! produce more optimised code than anything a human can produce.**
 //!
 //! [undefined behaviour]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
 //!
